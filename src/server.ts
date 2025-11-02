@@ -10,6 +10,7 @@ import { computeKnobs } from "./policyService.ts";
 import { SupermemoryStore } from "./memory/SupermemoryStore.ts";
 import { logger } from "./logger.ts";
 import { logApiCall } from "./debugLogger.ts";
+import { requireApiKey } from "./middleware/auth.ts";
 
 const app = express();
 
@@ -92,16 +93,26 @@ app.use((req, res, next) => {
 
 const memory = new SupermemoryStore();
 
-// Health check endpoint
+// Health check endpoint (public, no auth required)
 app.get('/health', (req, res) => {
   logger.debug('Health check requested');
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// API key authentication middleware - applies to all routes except /health
+app.use((req, res, next) => {
+  // Skip auth for health check
+  if (req.path === '/health') {
+    return next();
+  }
+  return requireApiKey(req, res, next);
 });
 
 // --- Supermemory v3 routes (generic, filterable) ---
 
 // POST /sm/save
 // Body: { serverInput, game_id?: string, genres?: string[], platforms?: string[] }
+// Requires: X-API-Key header
 app.post('/sm/save', async (req, res) => {
     try {
       const { serverInput } = req.body || {};

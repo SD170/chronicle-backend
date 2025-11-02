@@ -662,6 +662,47 @@ SUPERMEMORY_API_KEY=your_api_key_here
 
 # Game Configuration
 GAME_ID=default_game_id  # Optional, can be overridden in requests
+
+# API Keys (comma-separated list for authenticating requests)
+# Generate a key: npm run generate:api-key
+API_KEYS=chk_your_api_key_here,chk_another_key_here
+```
+
+### API Key Authentication
+
+All API endpoints (except `/health`) require API key authentication.
+
+**Generate an API Key:**
+```bash
+npm run generate:api-key
+```
+
+This will output a secure API key. Add it to your `.env` file:
+```bash
+API_KEYS=chk_generated_key_here
+```
+
+**Multiple API Keys:**
+You can add multiple keys (comma-separated) for different clients:
+```bash
+API_KEYS=chk_key1,chk_key2,chk_key3
+```
+
+**Using API Keys in Requests:**
+Provide the API key in one of these ways:
+- `X-API-Key` header (preferred)
+- `Authorization: Bearer <key>` header
+
+Example:
+```bash
+curl -X GET http://localhost:7769/sm/personas?player_id=user1 \
+  -H "X-API-Key: chk_your_api_key_here"
+```
+
+Or:
+```bash
+curl -X GET http://localhost:7769/sm/personas?player_id=user1 \
+  -H "Authorization: Bearer chk_your_api_key_here"
 ```
 
 ### Installation
@@ -698,6 +739,7 @@ Server runs on `http://localhost:7769` by default.
 ```bash
 curl -X POST http://localhost:7769/sm/save \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: chk_your_api_key_here" \
   -d '{
     "serverInput": {
       "schema_version": "1.0",
@@ -747,31 +789,43 @@ curl -X POST http://localhost:7769/sm/save \
 ### Example 2: Fetch All Personas
 
 ```bash
-curl "http://localhost:7769/sm/personas?player_id=player_123&limit=10"
+curl -X GET "http://localhost:7769/sm/personas?player_id=player_123" \
+  -H "X-API-Key: chk_your_api_key_here"
+```
+
+### Example 2b: Fetch with Filters
+
+```bash
+curl -X GET "http://localhost:7769/sm/personas?player_id=player_123&limit=10" \
+  -H "X-API-Key: chk_your_api_key_here"
 ```
 
 ### Example 3: Fetch Global Persona Only
 
 ```bash
-curl "http://localhost:7769/sm/personas?player_id=player_123&scope=global&limit=1"
+curl -X GET "http://localhost:7769/sm/personas?player_id=player_123&scope=global&limit=1" \
+  -H "X-API-Key: chk_your_api_key_here"
 ```
 
 ### Example 4: Fetch Platform Persona
 
 ```bash
-curl "http://localhost:7769/sm/personas?player_id=player_123&scope=platform&platform_id=pc&limit=1"
+curl -X GET "http://localhost:7769/sm/personas?player_id=player_123&scope=platform&platform_id=pc&limit=1" \
+  -H "X-API-Key: chk_your_api_key_here"
 ```
 
 ### Example 5: Fetch Game Persona
 
 ```bash
-curl "http://localhost:7769/sm/personas?player_id=player_123&scope=game&game_id=skyline_runner&limit=1"
+curl -X GET "http://localhost:7769/sm/personas?player_id=player_123&scope=game&game_id=skyline_runner&limit=1" \
+  -H "X-API-Key: chk_your_api_key_here"
 ```
 
 ### Example 6: Fetch Document by ID
 
 ```bash
-curl "http://localhost:7769/sm/doc/doc_id_here"
+curl -X GET "http://localhost:7769/sm/doc/doc_id_here" \
+  -H "X-API-Key: chk_your_api_key_here"
 ```
 
 ## Testing
