@@ -14,6 +14,7 @@ export const StatsZ = z.object({
   combats_initiated: z.number(),
   combats_won: z.number(),
   collectibles_found: z.number(),
+  mashing_intensity: z.number().optional(), // Button mashing speed (0.0-1.0)
 });
 export type Stats = z.infer<typeof StatsZ>;
 

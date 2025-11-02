@@ -5,7 +5,7 @@ import { connectMongo } from "./mongo.ts";
 import { RunModel } from "./models/Run.model.ts";
 import { ServerInputZ } from "./types.ts";
 import type { ServerInput, Traits, PersonaSnapshot, Mode } from "./types.ts";
-import { computeTraits, personaText, topSignals } from "./traitEngine.ts";
+import { computeTraits, personaText, topSignals, generateTraitExplanations } from "./traitEngine.ts";
 import { computeKnobs } from "./policyService.ts";
 import { SupermemoryStore } from "./memory/SupermemoryStore.ts";
 import { logger } from "./logger.ts";
@@ -133,6 +133,16 @@ app.post('/sm/save', async (req, res) => {
       const genres = Array.isArray(ctx.genre_ids) ? ctx.genre_ids : [];
       const platforms = Array.isArray(ctx.platform_ids) ? ctx.platform_ids : [];
   
+      // Fetch previous traits BEFORE saving (needed for trait explanations)
+      const prevGlobal = await memory.fetchLatestPersona(serverInput.player_id, { scope: 'global' });
+      const defaultTraits = {
+        aggression: 0.5, stealth: 0.5, curiosity: 0.5,
+        puzzle_affinity: 0.5, independence: 0.5, resilience: 0.5, goal_focus: 0.5,
+      };
+      const prevTraits = prevGlobal?.persona?.traits;
+      const newTraits = computeTraits(serverInput.stats, prevGlobal?.persona?.traits || defaultTraits);
+      const trait_explanations = generateTraitExplanations(serverInput.stats, prevGlobal?.persona?.traits, newTraits);
+  
       const result = await memory.saveFromServerInput(serverInput, {
         game_id,
         genres,
@@ -150,7 +160,10 @@ app.post('/sm/save', async (req, res) => {
         memories_created: result.memories_created,
       });
   
-      res.json(result);
+      res.json({
+        ...result,
+        trait_explanations,
+      });
   } catch (e: any) {
       logger.error('POST /sm/save: Error', {
         error: e.message,
@@ -294,13 +307,24 @@ app.post('/sm/save', async (req, res) => {
         });
       }
 
+      // Add trait explanations to each persona item
+      // Note: We can't generate full explanations for fetched personas without the original stats,
+      // but we can add a note that explanations are available in the save response
+      const itemsWithExplanations = result.items?.map((item: any) => ({
+        ...item,
+        trait_explanations_note: "Trait explanations are generated when saving data. Use POST /sm/save to see how stats affect traits."
+      })) || [];
+
       logger.info('GET /sm/personas: Success', {
         player_id,
         total: result.total,
         items_count: result.items?.length || 0,
       });
 
-      res.json(result);
+      res.json({
+        ...result,
+        items: itemsWithExplanations,
+      });
     } catch (e:any) {
       logger.error('GET /sm/personas: Error', {
         error: e.message,

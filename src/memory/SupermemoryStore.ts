@@ -1,7 +1,7 @@
 // src/memory/SupermemoryStore.ts
 import { ENV } from '../config.ts';
 import type { PersonaSnapshot, ServerInput, Traits } from '../types.ts';
-import { computeTraits, personaText, topSignals } from '../traitEngine.ts';
+import { computeTraits, personaText, topSignals, generateTraitExplanations } from '../traitEngine.ts';
 import { logger } from '../logger.ts';
 
 type PersonaScope = 'global' | 'genre' | 'platform' | 'game';
@@ -559,6 +559,7 @@ export class SupermemoryStore {
       updated_at: new Date().toISOString()
     };
   }
+
 
   /** Create individual memory documents for each trait, all linked to user node */
   private createTraitMemories(

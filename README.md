@@ -147,6 +147,7 @@ These numbers feed directly into trait computation. All must be provided (use `0
 - **`retries`**: Number of retries (affects resilience and goal_focus).
 - **`distance_traveled`**: Distance covered (used for curiosity computation).
 - **`jumps`**: Number of jumps (optional metric, currently not used in trait computation).
+- **`mashing_intensity`**: Button mashing speed/intensity (0.0-1.0, optional). Higher values indicate faster, more intense button pressing. Affects `aggression` and `goal_focus` traits.
 - **`hint_offers`**: Number of hints offered to player (used with hints_used for independence).
 - **`hints_used`**: Number of hints actually used (lowers independence trait).
 - **`riddles_attempted`**: Total riddles encountered (used for puzzle_affinity).
@@ -232,6 +233,7 @@ type Stats = {
   combats_initiated: number;           // Combats started (required)
   combats_won: number;                 // Combats won (required)
   collectibles_found: number;          // Collectibles found (required)
+  mashing_intensity?: number;          // Button mashing speed (0.0-1.0, optional)
 };
 ```
 
@@ -271,7 +273,9 @@ type PersonaSnapshot = {
 
 ```typescript
 type SaveResponse = {
-  global: {
+  user_node: string;                   // User node identifier
+  memories_created: number;            // Total number of trait memories created
+  batch_result: {
     results: Array<{
       id: string;                      // Supermemory document ID
       status: "queued" | "done" | "failed";
@@ -279,21 +283,14 @@ type SaveResponse = {
     failed: number;
     success: number;
   };
-  game: {
-    results: Array<{ id: string; status: string }>;
-    failed: number;
-    success: number;
-  } | null;                            // null if no game_id provided
-  genres: Array<{                      // One entry per genre (only first genre used)
-    results: Array<{ id: string; status: string }>;
-    failed: number;
-    success: number;
-  }>;
-  platforms: Array<{                   // One entry per platform (only first platform used)
-    results: Array<{ id: string; status: string }>;
-    failed: number;
-    success: number;
-  }>;
+  trait_explanations: string[];        // Array of explanations showing how stats affected each trait
+  // Example: [
+  //   "Aggression: increased from 0.50 to 0.42. Affected by: Started 1 combat(s), won 1 combat(s).",
+  //   "Curiosity: decreased from 0.50 to 0.31. Affected by: traveled 300 units.",
+  //   "Goal Focus: increased from 0.50 to 0.59. Affected by: fast completion (143s), no retries needed.",
+  //   ...
+  // ]
+  // Each explanation shows: trait name, change direction, previous value, new value, and contributing stats
 };
 ```
 
@@ -593,22 +590,25 @@ Each trait is calculated from specific gameplay attributes:
 
 | Trait | Attributes Used | Description |
 |-------|----------------|-------------|
-| **Aggression** | `combats_initiated`, `combats_won` | Measures combat preference. Higher if player starts and wins more combats. |
+| **Aggression** | `combats_initiated`, `combats_won`, `mashing_intensity` | Measures combat preference. Higher if player starts and wins more combats, or shows high button mashing intensity. |
 | **Stealth** | `combats_initiated`, `deaths` | Measures avoidance preference. Lower if player engages in combat or dies. |
 | **Curiosity** | `collectibles_found`, `distance_traveled` | Measures exploration tendency. Higher if player finds collectibles and travels more. |
 | **Puzzle Affinity** | `riddles_correct`, `riddles_attempted` | Measures puzzle-solving preference. Higher if player solves more riddles correctly. |
 | **Independence** | `hints_used`, `hint_offers` | Measures hint usage aversion. Perfect score (1.0) if hints offered but none used. Lower if player uses hints. |
 | **Resilience** | `retries`, `deaths`, `time_s` | Measures failure recovery. Higher if player retries after failure. Lower if they complete too quickly (might indicate avoiding challenges). |
-| **Goal Focus** | `time_s`, `retries` | Measures completion efficiency. Higher if player completes quickly and without retries. |
+| **Goal Focus** | `time_s`, `retries`, `mashing_intensity` | Measures completion efficiency. Higher if player completes quickly, without retries, or shows high button mashing intensity (indicating focused effort). |
 
 **Note:** The `jumps` attribute is currently not used in any trait calculation.
+
+**Mashing Intensity:** Button mashing speed (0.0-1.0) affects `aggression` and `goal_focus`. High mashing intensity (>.5) indicates aggressive, focused gameplay and adds a bonus to both traits.
 
 ### Trait Formulas
 
 ```typescript
 // Aggression: Combat preference
-// Attributes: combats_initiated (weight: 1.0), combats_won (weight: 0.5)
-aggression = (combats_initiated * 1.0 + combats_won * 0.5) / 5
+// Attributes: combats_initiated (weight: 1.0), combats_won (weight: 0.5), mashing_intensity (bonus: up to 0.3)
+// Mashing intensity adds up to 0.3 bonus (min(mashing_intensity, 1) * 0.3)
+aggression = (combats_initiated * 1.0 + combats_won * 0.5 + mashing_bonus) / 5
 
 // Stealth: Avoidance preference
 // Attributes: combats_initiated (penalty: -0.6 if > 0), deaths (penalty: -0.2 if > 0)
@@ -633,8 +633,9 @@ independence = (hint_offers > 0 && hints_used === 0) ? 1 : max(0, 1 - hints_used
 resilience = (retries * 0.8 + deaths * 0.4 - min(time_s/600, 1) * 0.2) / 3
 
 // Goal Focus: Completion efficiency
-// Attributes: time_s (bonus if < 180s, penalty if > 180s), retries (bonus: +0.2 if 0)
-goal_focus = (time_s < 180 ? 1 : max(0, 1 - (time_s-180)/300)) + (retries === 0 ? 0.2 : 0)
+// Attributes: time_s (bonus if < 180s, penalty if > 180s), retries (bonus: +0.2 if 0), mashing_intensity (bonus: up to 0.3)
+// Mashing intensity adds up to 0.3 bonus (min(mashing_intensity, 1) * 0.3) indicating focused effort
+goal_focus = (time_s < 180 ? 1 : max(0, 1 - (time_s-180)/300)) + (retries === 0 ? 0.2 : 0) + mashing_bonus
 goal_focus = goal_focus / 1.4
 ```
 
