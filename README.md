@@ -587,41 +587,85 @@ Applies across games on the same platform. Only the first platform from `platfor
 
 Traits are computed from `Stats` using weighted formulas, then normalized to 0.0-1.0 range.
 
+### Attribute Mapping
+
+Each trait is calculated from specific gameplay attributes:
+
+| Trait | Attributes Used | Description |
+|-------|----------------|-------------|
+| **Aggression** | `combats_initiated`, `combats_won` | Measures combat preference. Higher if player starts and wins more combats. |
+| **Stealth** | `combats_initiated`, `deaths` | Measures avoidance preference. Lower if player engages in combat or dies. |
+| **Curiosity** | `collectibles_found`, `distance_traveled` | Measures exploration tendency. Higher if player finds collectibles and travels more. |
+| **Puzzle Affinity** | `riddles_correct`, `riddles_attempted` | Measures puzzle-solving preference. Higher if player solves more riddles correctly. |
+| **Independence** | `hints_used`, `hint_offers` | Measures hint usage aversion. Perfect score (1.0) if hints offered but none used. Lower if player uses hints. |
+| **Resilience** | `retries`, `deaths`, `time_s` | Measures failure recovery. Higher if player retries after failure. Lower if they complete too quickly (might indicate avoiding challenges). |
+| **Goal Focus** | `time_s`, `retries` | Measures completion efficiency. Higher if player completes quickly and without retries. |
+
+**Note:** The `jumps` attribute is currently not used in any trait calculation.
+
 ### Trait Formulas
 
 ```typescript
 // Aggression: Combat preference
+// Attributes: combats_initiated (weight: 1.0), combats_won (weight: 0.5)
 aggression = (combats_initiated * 1.0 + combats_won * 0.5) / 5
 
-// Stealth: Avoidance preference  
+// Stealth: Avoidance preference
+// Attributes: combats_initiated (penalty: -0.6 if > 0), deaths (penalty: -0.2 if > 0)
 stealth = 1 - (combats_initiated > 0 ? 0.6 : 0) - (deaths > 0 ? 0.2 : 0)
 
 // Curiosity: Exploration tendency
+// Attributes: collectibles_found (weight: 0.7), distance_traveled (weight: 0.3, normalized by 500)
 curiosity = (collectibles_found * 0.7 + min(distance_traveled/500, 1) * 0.3) / 5
 
 // Puzzle Affinity: Puzzle-solving preference
+// Attributes: riddles_correct (weight: 1.0), riddles_attempted (partial credit: 0.2 per wrong)
 puzzle_affinity = (riddles_correct * 1.0 + (riddles_attempted - riddles_correct) * 0.2) / 3
 
 // Independence: Hint usage aversion
+// Attributes: hints_used (penalty: -0.5 per hint), hint_offers (checks if > 0)
+// Perfect score (1.0) if hints offered but none used
 independence = (hint_offers > 0 && hints_used === 0) ? 1 : max(0, 1 - hints_used * 0.5)
 
 // Resilience: Failure recovery
+// Attributes: retries (weight: +0.8), deaths (weight: +0.4), time_s (penalty: -0.2, normalized by 600s)
+// Note: Very fast completion (< 600s) reduces resilience (might indicate avoiding challenges)
 resilience = (retries * 0.8 + deaths * 0.4 - min(time_s/600, 1) * 0.2) / 3
 
 // Goal Focus: Completion efficiency
+// Attributes: time_s (bonus if < 180s, penalty if > 180s), retries (bonus: +0.2 if 0)
 goal_focus = (time_s < 180 ? 1 : max(0, 1 - (time_s-180)/300)) + (retries === 0 ? 0.2 : 0)
 goal_focus = goal_focus / 1.4
 ```
 
+### Calculation Examples
+
+**Example 1: Aggression**
+- Player starts 3 combats, wins 2
+- Raw: (3 × 1.0 + 2 × 0.5) = 4.0
+- Normalized: 4.0 / 5 = 0.80
+
+**Example 2: Independence**
+- Hints offered: 2, Hints used: 1
+- Calculation: max(0, 1 - 1 × 0.5) = 0.5
+- If hints offered but none used → 1.0 (perfect independence)
+
+**Example 3: Goal Focus**
+- Completion time: 75s, Retries: 0
+- Raw: (1.0 + 0.2) = 1.2
+- Normalized: 1.2 / 1.4 = 0.86
+
 ### Trait Blending
 
-When updating an existing persona, traits are blended:
+When updating an existing persona, traits are blended with previous values:
 
 ```typescript
 blended_trait = 0.6 * previous_trait + 0.4 * new_trait
 ```
 
-This creates a weighted average that preserves history while incorporating new behavior.
+This creates a weighted average that preserves history (60%) while incorporating new behavior (40%). Traits evolve gradually over time.
+
+**First Save:** If no previous persona exists, the system blends with default traits (all 0.5) instead of using raw values. This ensures consistent behavior from the first game session.
 
 ### Persona Text Generation
 

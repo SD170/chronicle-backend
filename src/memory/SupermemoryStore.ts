@@ -326,14 +326,25 @@ export class SupermemoryStore {
 
     // GLOBAL - fetch previous traits for blending
     const prevGlobal = await this.fetchLatestPersona(playerId, { scope: 'global' });
-    const globalSnap = this.buildSnapshot(playerId, serverInput.stats, prevGlobal?.persona?.traits);
+    // If no previous persona exists, use default traits (all 0.5) for blending
+    const defaultTraits: Traits = {
+      aggression: 0.5,
+      stealth: 0.5,
+      curiosity: 0.5,
+      puzzle_affinity: 0.5,
+      independence: 0.5,
+      resilience: 0.5,
+      goal_focus: 0.5,
+    };
+    const globalSnap = this.buildSnapshot(playerId, serverInput.stats, prevGlobal?.persona?.traits || defaultTraits);
     const globalMemories = this.createTraitMemories(playerId, globalSnap.traits, { scope: 'global' }, extraMeta);
     allMemories.push(...globalMemories);
 
     // GAME
     if (gameId) {
       const prevGame = await this.fetchLatestPersona(playerId, { scope: 'game', game_id: gameId });
-      const gameSnap = this.buildSnapshot(playerId, serverInput.stats, prevGame?.persona?.traits);
+      // Use default traits if no previous game persona exists
+      const gameSnap = this.buildSnapshot(playerId, serverInput.stats, prevGame?.persona?.traits || defaultTraits);
       const gameMemories = this.createTraitMemories(playerId, gameSnap.traits, { scope: 'game', game_id: gameId }, extraMeta);
       allMemories.push(...gameMemories);
     }
@@ -342,7 +353,7 @@ export class SupermemoryStore {
     if (genres.length > 0) {
       const genre = genres[0]!;
       const prev = await this.fetchLatestPersona(playerId, { scope: 'genre', genre_id: genre });
-      const snap = this.buildSnapshot(playerId, serverInput.stats, prev?.persona?.traits);
+      const snap = this.buildSnapshot(playerId, serverInput.stats, prev?.persona?.traits || defaultTraits);
       const genreMemories = this.createTraitMemories(playerId, snap.traits, { scope: 'genre', genre_id: genre }, { ...extraMeta, genre_id: genre });
       allMemories.push(...genreMemories);
     }
@@ -351,7 +362,7 @@ export class SupermemoryStore {
     if (platforms.length > 0) {
       const plat = platforms[0]!;
       const prev = await this.fetchLatestPersona(playerId, { scope: 'platform', platform_id: plat });
-      const snap = this.buildSnapshot(playerId, serverInput.stats, prev?.persona?.traits);
+      const snap = this.buildSnapshot(playerId, serverInput.stats, prev?.persona?.traits || defaultTraits);
       const platformMemories = this.createTraitMemories(playerId, snap.traits, { scope: 'platform', platform_id: plat }, { ...extraMeta, platform_id: plat });
       allMemories.push(...platformMemories);
     }

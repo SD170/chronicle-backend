@@ -151,7 +151,7 @@ app.post('/sm/save', async (req, res) => {
       });
   
       res.json(result);
-    } catch (e: any) {
+  } catch (e: any) {
       logger.error('POST /sm/save: Error', {
         error: e.message,
         stack: e.stack,
