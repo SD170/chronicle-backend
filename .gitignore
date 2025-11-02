@@ -1,0 +1,7 @@
+/node_modules
+/static
+TEST_COMMANDS.txt
+logs
+debug
+.env
+dist
